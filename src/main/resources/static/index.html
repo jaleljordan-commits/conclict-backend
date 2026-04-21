@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conflict Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        select, input {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+        .status-active {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .status-frozen {
+            color: #ffc107;
+        }
+        .status-ended {
+            color: #28a745;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+            padding: 10px;
+            background-color: #f8d7da;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            margin-bottom: 20px;
+        }
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+            color: black;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #007bff;
+            color: white;
+        }
+        .tabcontent {
+            display: none;
+            padding: 6px 12px;
+            border: 1px solid #ccc;
+            border-top: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🌍 Conflict Tracker</h1>
+
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'Conflicts')">Conflicts</button>
+        <button class="tablinks" onclick="openTab(event, 'Countries')">Countries</button>
+        <button class="tablinks" onclick="openTab(event, 'Factions')">Factions</button>
+        <button class="tablinks" onclick="openTab(event, 'Events')">Events</button>
+    </div>
+
+    <!-- Conflicts Tab -->
+    <div id="Conflicts" class="tabcontent" style="display: block;">
+        <div class="controls">
+            <button onclick="loadConflicts()">Load All Conflicts</button>
+            <select id="statusFilter" onchange="loadConflictsByStatus()">
+                <option value="">Filter by Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="FROZEN">Frozen</option>
+                <option value="ENDED">Ended</option>
+            </select>
+            <input type="text" id="countryCodeInput" placeholder="Country code (e.g., UKR)">
+            <button onclick="loadConflictsByCountry()">Get Conflicts by Country</button>
+        </div>
+        <div id="conflicts-content"></div>
+    </div>
+
+    <!-- Countries Tab -->
+    <div id="Countries" class="tabcontent">
+        <div class="controls">
+            <button onclick="loadCountries()">Load All Countries</button>
+        </div>
+        <div id="countries-content"></div>
+    </div>
+
+    <!-- Factions Tab -->
+    <div id="Factions" class="tabcontent">
+        <div class="controls">
+            <button onclick="loadFactions()">Load All Factions</button>
+        </div>
+        <div id="factions-content"></div>
+    </div>
+
+    <!-- Events Tab -->
+    <div id="Events" class="tabcontent">
+        <div class="controls">
+            <button onclick="loadEvents()">Load All Events</button>
+        </div>
+        <div id="events-content"></div>
+    </div>
+
+    <div id="loading" class="loading">Loading...</div>
+    <div id="error" class="error" style="display: none;"></div>
+</div>
+
+<script>
+    // Tab functionality
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tablinks");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    // Utility functions
+    function showLoading() {
+        document.getElementById('loading').style.display = 'block';
+    }
+
+    function hideLoading() {
+        document.getElementById('loading').style.display = 'none';
+    }
+
+    function showError(message) {
+        const errorDiv = document.getElementById('error');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+
+    function hideError() {
+        document.getElementById('error').style.display = 'none';
+    }
+
+    // Conflicts functions
+    async function loadConflicts() {
+        showLoading();
+        hideError();
+
+        try {
+            const response = await fetch('/api/v1/conflicts');
+            const conflicts = await response.json();
+            displayConflicts(conflicts);
+        } catch (error) {
+            showError('Error loading conflicts: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    async function loadConflictsByStatus() {
+        const status = document.getElementById('statusFilter').value;
+        if (!status) return;
+
+        showLoading();
+        hideError();
+
+        try {
+            const response = await fetch(`/api/v1/conflicts?status=${status}`);
+            const conflicts = await response.json();
+            displayConflicts(conflicts);
+        } catch (error) {
+            showError('Error loading conflicts: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    async function loadConflictsByCountry() {
+        const countryCode = document.getElementById('countryCodeInput').value.trim().toUpperCase();
+        if (!countryCode) {
+            showError('Please enter a country code');
+            return;
+        }
+
+        showLoading();
+        hideError();
+
+        try {
+            const response = await fetch(`/api/v1/countries/${countryCode}/conflicts`);
+            const conflicts = await response.json();
+            displayConflicts(conflicts);
+        } catch (error) {
+            showError('Error loading conflicts: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function displayConflicts(conflicts) {
+        const content = document.getElementById('conflicts-content');
+
+        if (conflicts.length === 0) {
+            content.innerHTML = '<p>No conflicts found.</p>';
+            return;
+        }
+
+        let html = `
+            <h3>Conflicts (${conflicts.length})</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Start Date</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                        <th>Countries</th>
+                        <th>Factions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        conflicts.forEach(conflict => {
+            const statusClass = `status-${conflict.status.toLowerCase()}`;
+            const countries = conflict.countryNames ? Array.from(conflict.countryNames).join(', ') : '';
+            const factions = conflict.factionNames ? Array.from(conflict.factionNames).join(', ') : '';
+            const description = conflict.description ? conflict.description.substring(0, 100) + '...' : '';
+
+            html += `
+                <tr>
+                    <td><strong>${conflict.name}</strong></td>
+                    <td>${conflict.startDate}</td>
+                    <td class="${statusClass}">${conflict.status}</td>
+                    <td>${description}</td>
+                    <td>${countries}</td>
+                    <td>${factions}</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table>';
+        content.innerHTML = html;
+    }
+
+    // Countries functions
+    async function loadCountries() {
+        showLoading();
+        hideError();
+
+        try {
+            const response = await fetch('/api/v1/countries');
+            const countries = await response.json();
+            displayCountries(countries);
+        } catch (error) {
+            showError('Error loading countries: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function displayCountries(countries) {
+        const content = document.getElementById('countries-content');
+
+        if (countries.length === 0) {
+            content.innerHTML = '<p>No countries found.</p>';
+            return;
+        }
+
+        let html = `
+            <h3>Countries (${countries.length})</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Code</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        countries.forEach(country => {
+            html += `
+                <tr>
+                    <td>${country.name}</td>
+                    <td><strong>${country.code}</strong></td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table>';
+        content.innerHTML = html;
+    }
+
+    // Factions functions
+    async function loadFactions() {
+        showLoading();
+        hideError();
+
+        try {
+            const response = await fetch('/api/v1/factions');
+            const factions = await response.json();
+            displayFactions(factions);
+        } catch (error) {
+            showError('Error loading factions: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function displayFactions(factions) {
+        const content = document.getElementById('factions-content');
+
+        if (factions.length === 0) {
+            content.innerHTML = '<p>No factions found.</p>';
+            return;
+        }
+
+        let html = `
+            <h3>Factions (${factions.length})</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Conflict</th>
+                        <th>Supporting Countries</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        factions.forEach(faction => {
+            const countries = faction.supportingCountryNames ? Array.from(faction.supportingCountryNames).join(', ') : '';
+
+            html += `
+                <tr>
+                    <td><strong>${faction.name}</strong></td>
+                    <td>${faction.conflictName}</td>
+                    <td>${countries}</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table>';
+        content.innerHTML = html;
+    }
+
+    // Events functions
+    async function loadEvents() {
+        showLoading();
+        hideError();
+
+        try {
+            const response = await fetch('/api/v1/events');
+            const events = await response.json();
+            displayEvents(events);
+        } catch (error) {
+            showError('Error loading events: ' + error.message);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    function displayEvents(events) {
+        const content = document.getElementById('events-content');
+
+        if (events.length === 0) {
+            content.innerHTML = '<p>No events found.</p>';
+            return;
+        }
+
+        let html = `
+            <h3>Events (${events.length})</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Location</th>
+                        <th>Description</th>
+                        <th>Conflict</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        events.forEach(event => {
+            const description = event.description ? event.description.substring(0, 100) + '...' : '';
+
+            html += `
+                <tr>
+                    <td>${event.eventDate}</td>
+                    <td>${event.location}</td>
+                    <td>${description}</td>
+                    <td>${event.conflictName}</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table>';
+        content.innerHTML = html;
+    }
+
+    // Load conflicts on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadConflicts();
+    });
+</script>
+</body>
+</html>
